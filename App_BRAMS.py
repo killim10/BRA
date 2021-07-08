@@ -400,7 +400,7 @@ if genre == 'Meteostat':
 
     elif interval_select == "Mensal":
 
-        dfH = consultar_dados_hourly(format_date(from_date), format_date(to_date))
+        df = consultar_dados_hourly(format_date(from_date), format_date(to_date))
         try:
             x = df.index
             fig1 = go.Figure()
@@ -429,7 +429,7 @@ if genre == 'Meteostat':
             
             if carregar_dados:
                 st.subheader('Dados')
-                dados = st.dataframe(dfH)
+                dados = st.dataframe(df)
         except Exception as e:
             st.error(e)
 
