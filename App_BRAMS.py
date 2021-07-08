@@ -46,8 +46,10 @@ def consultar_dados_daily(from_date, to_date):
 
     data = Daily(83423, start = from_date, end = to_date)
     df = data.fetch()
+    periodo = int(len(df["wspd"])/2)
+    result = seasonal_decompose(df["wspd"], model='additive', extrapolate_trend='freq', period= periodo)
     
-    return(df)
+    return(df, result)
 # Função para formatar datas
 def format_date(dt, format='%Y-%m-%d %H:%M:%S'):
     
@@ -359,9 +361,30 @@ if genre == 'Meteostat':
     if from_date > to_date:
         st.sidebar.error('Data de ínicio maior do que data final')
     elif interval_select == "Diária":
-        df = consultar_dados_daily(format_date(from_date), format_date(to_date))
+        df, result = consultar_dados_daily(format_date(from_date), format_date(to_date))
         try:
             grafico_line = st.line_chart(df["wspd"])
+            
+            fig1 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=df["wspd"],
+                                    mode='lines',
+                                    name='Taxa de aparecimento do 1º sintoma'))
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=result,
+                                    mode='lines',
+                                    name='Taxa de aparecimento do 1º sintoma'))                                        
+            # Formatando o layout do gráfico
+            fig1.update_layout(title='Série temporal completa',
+                            xaxis_title='Data',
+                            yaxis_title='Velocidade (m/s)',
+                            width=900,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig1)
+            
             
             if carregar_dados:
                 st.subheader('Dados')
