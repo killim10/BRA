@@ -372,7 +372,7 @@ if genre == 'Meteostat':
                                     mode='lines',
                                     name='Taxa de aparecimento do 1º sintoma'))
             # Funções 'add_trace' para criar as linhas do gráfico
-            fig1.add_trace(go.Scatter(x=x, y=result,
+            fig1.add_trace(go.Scatter(x=x, y=result.seasonal,
                                     mode='lines',
                                     name='Taxa de aparecimento do 1º sintoma'))                                        
             # Formatando o layout do gráfico
