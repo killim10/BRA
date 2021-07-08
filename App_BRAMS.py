@@ -364,7 +364,7 @@ if genre == 'Meteostat':
         df, result = consultar_dados_daily(format_date(from_date), format_date(to_date))
         try:
             grafico_line = st.line_chart(df["wspd"])
-            
+            x = df.index
             fig1 = go.Figure()
 
             # Funções 'add_trace' para criar as linhas do gráfico
