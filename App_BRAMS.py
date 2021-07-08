@@ -7,10 +7,14 @@ import matplotlib.pyplot as plt
 from bokeh.plotting import figure
 from meteostat import Stations, Daily, Hourly, Monthly
 import numpy as np
+from statsmodels.tsa.stattools import acf, pacf
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.seasonal import seasonal_decompose
+from dateutil.parser import parse
 
 
-countries = ['brazil','united states']
-intervals = ['Hourly', 'Daily', 'Monthly']
+countries = ['Brasil','EUA']
+intervals = ['Horária', 'Diária', 'Mensal']
 cidades = ["Goiânia", "Fortaleza", "Natal", "Brasília"]
 
 start_date = datetime.now()-timedelta(days=30)
@@ -50,34 +54,44 @@ def format_date(dt, format='%Y-%m-%d %H:%M:%S'):
     return dt.strftime(format)
 
 
-def format_date_dia(dt, format='%y-%m-%d'):
+def format_date_dia(dt, format='%d-%m'):
     
     return dt.strftime(format)
 
-
 @st.cache
-def excel_dados_daily(data_excelI, data_excelF):
+def excel_dados_diaria(data_excelI, data_excelF):
     
     mask = dft.loc[(pd.to_datetime(dft["TIMESTAMP"]) >= data_excelI) & (pd.to_datetime(dft["TIMESTAMP"]) <= data_excelF)] 
     #mask.set_index('TIMESTAMP', inplace=True)
+  
+    dto = mask.groupby(pd.to_datetime(mask["TIMESTAMP"]).dt.strftime('%j')).mean()
 
+    dtd = mask.groupby(pd.to_datetime(mask["TIMESTAMP"]).dt.strftime('%j')).std()
+
+    periodo = int(len(dto)/2)
+
+    result = seasonal_decompose(dto["wnd_spd"], model='additive', extrapolate_trend='freq', period= periodo)
+
+    return mask, dto, dtd, result
+
+@st.cache
+def excel_dados_mensal(data_excelI, data_excelF):
     
-
-    dto = (mask.groupby(pd.to_datetime(mask["TIMESTAMP"]).dt.strftime('%j')).mean())
-
+    mask = dft.loc[(pd.to_datetime(dft["TIMESTAMP"]) >= data_excelI) & (pd.to_datetime(dft["TIMESTAMP"]) <= data_excelF)] 
     
-    return mask, dto
-
+    dto = mask.groupby(pd.to_datetime(mask["TIMESTAMP"]).dt.strftime('%m')).mean()  
     
-def media_diaria():
+    dtd = mask.groupby(pd.to_datetime(mask["TIMESTAMP"]).dt.strftime('%m')).std()
 
-    df = pd.DataFrame(index=pd.date_range('2015-01-01', '2015-12-31'))
+    dt_max = mask.groupby(pd.to_datetime(mask["TIMESTAMP"]).dt.strftime('%m')).max()
 
-    print(df.groupby(df.index.strftime("%j")).mean())
+    periodo = int(len(dto)/2)
 
+    result = seasonal_decompose(dto["wnd_spd"], model='additive', extrapolate_trend='freq', period= periodo)
 
+    return mask, dto, dtd, result
 
-
+  
 
 
 
@@ -101,70 +115,120 @@ if genre == 'Excel':
 
     dft = dft.drop(dft.index[0:3])
 
-    
-
     dft.columns = ["TIMESTAMP", "wnd_spd", "rslt_wnd_spd", "wnd_dir_sonic", "std_wnd_dir", "wnd_dir_compass", "Ux_Avg",	"Uy_Avg",
                     "Uz_Avg", "u_star",	"Ux_stdev",	"Ux_Uy_cov", "Ux_Uz_cov", "Uy_stdev", "Uy_Uz_cov", "Uz_stdev"]
     
     dft = pd.DataFrame(dft)
 
-    dft = dft.replace(np.nan,0)
-
-
-    #dft.to_excel('C:/Users/bacab/OneDrive/Área de Trabalho/Projeto_BRAMS/Dados_Cerrado/dados_temporario.xlsx', index = False)
-
-    dft = pd.read_excel('C:/Users/bacab/OneDrive/Área de Trabalho/Projeto_BRAMS/Dados_Cerrado/dados_temporario.xlsx')
-
-
+    dft.ffill(inplace=True)
 
     date = list(dft["TIMESTAMP"])
 
     dateI = pd.to_datetime(date[0], format='%d-%m-%Y')
     dateF = pd.to_datetime(date[-1], format='%d-%m-%Y')
 
-    data_excelI = st.sidebar.date_input('Data inicial:', dateI)
-    data_excelF = st.sidebar.date_input('Data final:', dateF)
-
     interval_select = st.sidebar.selectbox("Análise:", intervals)
-    
+    data_excelI = st.sidebar.date_input('Data inicial:', dateI)
+    data_excelF = st.sidebar.date_input('Data final:', dateF)   
     carregar_dados = st.sidebar.checkbox('Carregar dados') 
 
     st.title('Análise preliminar de sítio eólico') #elementos centrais da página
 
     st.write(dft)
 
+    #dft = dft.rename(columns={'TIMESTAMP':'index'}).set_index('index')
+
+
+
 
     if data_excelI > data_excelF:
         st.sidebar.error('Data de ínicio maior do que data final')
-    elif interval_select == "Daily":
 
-        mask, dto = excel_dados_daily(format_date(data_excelI), format_date(data_excelF))
+    elif interval_select == "Diária":
+
+        mask, dto, dtd, result = excel_dados_diaria(format_date(data_excelI), format_date(data_excelF))
+
+       # data_f = sazonalidade_diaria(format_date(data_excelI), format_date(data_excelF))
 
         tempo = pd.to_datetime(mask["TIMESTAMP"], format="%d")
 
         try:
-
-            fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-
-            ax.plot(
-                tempo,
-                mask["wnd_spd"],
-            )
-
-            ax.set_xlabel("Tempo (dias)")
-            ax.set_ylabel("velocidade (m/s)")
-            ax.grid(True)
-            ax.set_xlim(min(mask["TIMESTAMP"]), max(mask["TIMESTAMP"]))
-
-            st.write(fig)
-
-
             
+            x = mask['TIMESTAMP']
+            # Criando o objeto do gráfico
+            fig1 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=dft["wnd_spd"],
+                                    mode='lines',
+                                    name='Taxa de aparecimento do 1º sintoma'))
+                                                    
+            # Formatando o layout do gráfico
+            fig1.update_layout(title='Série temporal completa',
+                            xaxis_title='Data',
+                            yaxis_title='Velocidade (m/s)',
+                            width=900,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig1)
+
+            """ Aqui são apresentados os valores de média diária"""	
+
             st.title("Tabela de Médias diária")
             st.write(dto)  
 
-            grafico_line = st.line_chart(dto["wnd_spd"])
+
+            x2 = dto.index
+            # Criando o objeto do gráfico
+            fig2 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig2.add_trace(go.Scatter(x=x2, y=dto["wnd_spd"],
+                                    mode='lines',
+                                    name='Média diária'))
+
+            fig2.add_trace(go.Scatter(x=x2, y=result.seasonal,
+                                    mode='lines',
+                                    name='Sazonalidade Diária'))
+
+            fig2.add_trace(go.Scatter(x=x2, y=result.trend,
+                                    mode='lines',
+                                    name='Tendência Diária'))  
+                                                    
+            # Formatando o layout do gráfico
+            fig2.update_layout(title='Média diária para velocidade do vento',
+                            xaxis_title='Dias',
+                            yaxis_title='Velocidade (m/s)',
+                            width=1000,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig2)
+
+            """ Aqui são apresentados os valores de desvio Padrão diário"""
+
+            st.title("Tabela de Desvio Padrão diário")
+            st.write(dtd)  
+
+            x3 = dtd.index
+            # Criando o objeto do gráfico
+            fig3 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig3.add_trace(go.Scatter(x=x3, y=dtd["wnd_spd"],
+                                    mode='lines',
+                                    name='Média diária'))
+                                                    
+            # Formatando o layout do gráfico
+            fig3.update_layout(title='Média diária para velocidade do vento',
+                            xaxis_title='Dias',
+                            yaxis_title='Desvio Padrão',
+                            width=1000,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig3)
             
             if carregar_dados:
                 st.subheader('Dados')
@@ -172,15 +236,93 @@ if genre == 'Excel':
         except Exception as e:
             st.error(e)
 
-    elif interval_select == "Hourly":
 
-        dfH = consultar_dados_hourly(format_date(data_excelI), format_date(data_excelF))
+
+    elif interval_select == "Mensal":
+
+        mask, dto, dtd, result = excel_dados_mensal(format_date(data_excelI), format_date(data_excelF))
+
+        tempo = pd.to_datetime(mask["TIMESTAMP"], format="%d")
+        
         try:
-            grafico_line = st.line_chart(dfH["wspd"])
+            x = mask['TIMESTAMP']
+            # Criando o objeto do gráfico
+            fig1 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=dft["wnd_spd"],
+                                    mode='lines',
+                                    name='Taxa de aparecimento do 1º sintoma'))
+                                                    
+            # Formatando o layout do gráfico
+            fig1.update_layout(title='Série temporal completa',
+                            xaxis_title='Meses',
+                            yaxis_title='Velocidade (m/s)',
+                            width=900,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig1)
+
+            """ Aqui são apresentados os valores de média Mensal"""	
+
+            st.title("Tabela de Médias Mensais")
+            st.write(dto)  
+
+
+            x2 = dto.index
+            # Criando o objeto do gráfico
+            fig2 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig2.add_trace(go.Scatter(x=x2, y=dto["wnd_spd"],
+                                    mode='lines',
+                                    name='Média Mensal'))
+
+            fig2.add_trace(go.Scatter(x=x2, y=result.seasonal,
+                                    mode='lines',
+                                    name='Sazonalidade Mensal'))
+
+            fig2.add_trace(go.Scatter(x=x2, y=result.trend,
+                                    mode='lines',
+                                    name='Tencência Mensal'))                                                    
+            # Formatando o layout do gráfico
+            fig2.update_layout(title='Média mensal para velocidade do vento',
+                            xaxis_title='Meses',
+                            yaxis_title='Velocidade (m/s)',
+                            width=1000,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig2)
+
+            """ Aqui são apresentados os valores de desvio Padrão diário"""
+
+            st.title("Tabela de Desvio Padrão diário")
+            st.write(dtd)  
+
+            x3 = dtd.index
+            # Criando o objeto do gráfico
+            fig3 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig3.add_trace(go.Scatter(x=x3, y=dtd["wnd_spd"],
+                                    mode='lines',
+                                    name='Média diária'))
+                                                    
+            # Formatando o layout do gráfico
+            fig3.update_layout(title='Média diária para velocidade do vento',
+                            xaxis_title='Dias',
+                            yaxis_title='Velocidade (m/s)',
+                            width=1000,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig3)
             
             if carregar_dados:
                 st.subheader('Dados')
-                dados = st.dataframe(dfH)
+                dados = st.dataframe(dto)
         except Exception as e:
             st.error(e)
 
@@ -216,7 +358,7 @@ if genre == 'Meteostat':
 
     if from_date > to_date:
         st.sidebar.error('Data de ínicio maior do que data final')
-    elif interval_select == "Daily":
+    elif interval_select == "Diária":
         df = consultar_dados_daily(format_date(from_date), format_date(to_date))
         try:
             grafico_line = st.line_chart(df["wspd"])
@@ -227,7 +369,7 @@ if genre == 'Meteostat':
         except Exception as e:
             st.error(e)
 
-    elif interval_select == "Hourly":
+    elif interval_select == "Horária":
 
         dfH = consultar_dados_hourly(format_date(from_date), format_date(to_date))
         try:
