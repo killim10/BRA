@@ -400,7 +400,7 @@ if genre == 'Meteostat':
 
     elif interval_select == "Mensal":
 
-        df = consultar_dados_hourly(format_date(from_date), format_date(to_date))
+        df = consultar_dados_monthly(format_date(from_date), format_date(to_date))
         try:
             x = df.index
             fig1 = go.Figure()
