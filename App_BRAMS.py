@@ -30,7 +30,7 @@ def consultar_dados_monthly(from_date, to_date):
     data = Monthly(83423, start = from_date, end = to_date)
     
     df = data.fetch() 
-    
+    periodo = int(len(df["wspd"])/2)
     result = seasonal_decompose(df["wspd"], model='additive', extrapolate_trend='freq', period= periodo)
     
     return(df, result)
