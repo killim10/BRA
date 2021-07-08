@@ -1,7 +1,6 @@
 from numpy import datetime64
 import streamlit as st
 import pandas as pd
-import investpy as ip
 from datetime import datetime, timedelta
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
