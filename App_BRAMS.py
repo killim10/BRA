@@ -25,13 +25,15 @@ stop = datetime.now()
 
 
 @st.cache
-def consultar_dados_hourly(from_date, to_date):
+def consultar_dados_monthly(from_date, to_date):
 
-    dataH = Hourly(83423, start = ende, end = stop)
+    data = Monthly(83423, start = from_date, end = to_date)
     
-    dfH = dataH.fetch()   
-
-    return dfH
+    df = data.fetch() 
+    
+    result = seasonal_decompose(df["wspd"], model='additive', extrapolate_trend='freq', period= periodo)
+    
+    return(df, result)
 
 
 
@@ -396,11 +398,34 @@ if genre == 'Meteostat':
         except Exception as e:
             st.error(e)
 
-    elif interval_select == "Horária":
+    elif interval_select == "Mensal":
 
         dfH = consultar_dados_hourly(format_date(from_date), format_date(to_date))
         try:
-            grafico_line = st.line_chart(dfH["wspd"])
+            x = df.index
+            fig1 = go.Figure()
+
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=df["wspd"],
+                                    mode='lines',
+                                    name='Série temporal de Velocidade'))
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=result.seasonal,
+                                    mode='lines',
+                                    name='Sazonalidade Diária'))    
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=result.trend,
+                                    mode='lines',
+                                    name='Tendência Diária'))
+            # Formatando o layout do gráfico
+            fig1.update_layout(title='Série temporal completa',
+                            xaxis_title='Data',
+                            yaxis_title='Velocidade (m/s)',
+                            width=900,
+                            height=600)
+
+            # Exibindo o elemento do gráfico na página                
+            st.plotly_chart(fig1)
             
             if carregar_dados:
                 st.subheader('Dados')
