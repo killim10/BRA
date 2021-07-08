@@ -363,18 +363,22 @@ if genre == 'Meteostat':
     elif interval_select == "Diária":
         df, result = consultar_dados_daily(format_date(from_date), format_date(to_date))
         try:
-            grafico_line = st.line_chart(df["wspd"])
+            
             x = df.index
             fig1 = go.Figure()
 
             # Funções 'add_trace' para criar as linhas do gráfico
             fig1.add_trace(go.Scatter(x=x, y=df["wspd"],
                                     mode='lines',
-                                    name='Taxa de aparecimento do 1º sintoma'))
+                                    name='Série temporal de Velocidade'))
             # Funções 'add_trace' para criar as linhas do gráfico
             fig1.add_trace(go.Scatter(x=x, y=result.seasonal,
                                     mode='lines',
-                                    name='Taxa de aparecimento do 1º sintoma'))                                        
+                                    name='Sazonalidade Diária'))    
+            # Funções 'add_trace' para criar as linhas do gráfico
+            fig1.add_trace(go.Scatter(x=x, y=result.trend,
+                                    mode='lines',
+                                    name='Tendência Diária'))
             # Formatando o layout do gráfico
             fig1.update_layout(title='Série temporal completa',
                             xaxis_title='Data',
